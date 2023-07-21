@@ -26,6 +26,8 @@ PAGE_NO = 1
 PAGES = 0
 
 
+
+
 class MirrorStatus:
     if config_dict['EMOJI_THEME']:
         STATUS_UPLOADING = "📤 Upload"
@@ -39,7 +41,6 @@ class MirrorStatus:
         STATUS_SPLITTING = "✂️ Split"
         STATUS_CHECKING = "📝 CheckUp"
         STATUS_SEEDING = "🌧 Seed"
-        STATUS_CONVERTING = "↔️ Convert"
     else:
         STATUS_UPLOADING = "Upload"
         STATUS_DOWNLOADING = "Download"
@@ -52,7 +53,7 @@ class MirrorStatus:
         STATUS_SPLITTING = "Split"
         STATUS_CHECKING = "CheckUp"
         STATUS_SEEDING = "Seed"
-        STATUS_CONVERTING = "↔️ Convert"
+    STATUS_CONVERTING = "↔️ Convert"
 
 class EngineStatus:
     STATUS_ARIA = "Aria2c📶"
@@ -66,7 +67,7 @@ class EngineStatus:
     STATUS_ZIP = "p7zip🛠"
     STATUS_QUEUE = "Sleep💤"
 
-    
+
 SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
 
 class setInterval:
@@ -144,11 +145,9 @@ def get_user_task(user_id):
 def get_bot_pm(user_id):
     if config_dict['FORCE_BOT_PM']:
         return True
-    else:
-        if not (user_id in user_data and user_data[user_id].get('ubot_pm')):
-            update_user_ldata(user_id, 'ubot_pm', config_dict['BOT_PM'])
-        botpm = user_data[user_id].get('ubot_pm')
-        return botpm
+    if user_id not in user_data or not user_data[user_id].get('ubot_pm'):
+        update_user_ldata(user_id, 'ubot_pm', config_dict['BOT_PM'])
+    return user_data[user_id].get('ubot_pm')
 
 def getGDriveUploadUtils(user_id, u_index, c_index):
     GDRIVEID = config_dict['GDRIVE_ID']
@@ -178,10 +177,10 @@ def getUserTDs(user_id, force=False):
 def handleIndex(index, dic):
     """Handle IndexError for any List (Runs Index Loop) +ve & -ve Supported"""
     while True:
-        if abs(index) >= len(dic):
-            if index < 0: index = len(dic) - abs(index)
-            elif index > 0: index = index - len(dic)
-        else: break
+        if abs(index) < len(dic):
+            break
+        if index < 0: index = len(dic) - abs(index)
+        elif index > 0: index = index - len(dic)
     return index
 
 def userlistype(user_id):
@@ -209,15 +208,17 @@ def progress_bar(percentage):
     return "".join(comp if i <= percentage // 10 else ncomp for i in range(1, 11))
 
 def timeformatter(milliseconds: int) -> str:
-    seconds, milliseconds = divmod(int(milliseconds), 1000)
+    seconds, milliseconds = divmod(milliseconds, 1000)
     minutes, seconds = divmod(seconds, 60)
     hours, minutes = divmod(minutes, 60)
     days, hours = divmod(hours, 24)
-    tmp = ((str(days) + " days, ") if days else "") + \
-        ((str(hours) + " hours, ") if hours else "") + \
-        ((str(minutes) + " min, ") if minutes else "") + \
-        ((str(seconds) + " sec, ") if seconds else "") + \
-        ((str(milliseconds) + " millisec, ") if milliseconds else "")
+    tmp = (
+        (f"{str(days)} days, " if days else "")
+        + (f"{str(hours)} hours, " if hours else "")
+        + (f"{str(minutes)} min, " if minutes else "")
+        + (f"{str(seconds)} sec, " if seconds else "")
+        + (f"{str(milliseconds)} millisec, " if milliseconds else "")
+    )
     return tmp[:-2]
 
 def get_progress_bar_string(status):
@@ -274,7 +275,15 @@ def get_readable_message():
                             msg += f"\n<b>├ Select:</b> <code>/{BotCommands.BtSelectCommand} {download.gid()}</code>"
                     except:
                         pass
-                if download.message.chat.type != 'private':
+                if download.message.chat.type == 'private':
+                    if config_dict['EMOJI_THEME']:
+                        msg += f'\n<b>├👤 User:</b> ️<code>{download.message.from_user.first_name}</code> | <b>Id:</b> <code>{download.message.from_user.id}</code>'
+                        msg += f"\n<b>╰❌ </b><code>/{BotCommands.CancelMirror} {download.gid()}</code>"
+                    else:
+                        msg += f'\n<b>├ User:</b> ️<code>{download.message.from_user.first_name}</code> | <b>Id:</b> <code>{download.message.from_user.id}</code>'
+                        msg += f"\n<b>╰ Cancel: </b><code>/{BotCommands.CancelMirror} {download.gid()}</code>"
+
+                else:
                     try:
                         chatid = str(download.message.chat.id)[4:]
                         if config_dict['EMOJI_THEME']:
@@ -285,14 +294,6 @@ def get_readable_message():
                             msg += f"\n<b>╰ Cancel: </b><code>/{BotCommands.CancelMirror} {download.gid()}</code>"                 
                     except:
                         pass
-                else:
-                    if config_dict['EMOJI_THEME']:
-                        msg += f'\n<b>├👤 User:</b> ️<code>{download.message.from_user.first_name}</code> | <b>Id:</b> <code>{download.message.from_user.id}</code>'
-                        msg += f"\n<b>╰❌ </b><code>/{BotCommands.CancelMirror} {download.gid()}</code>"
-                    else:
-                        msg += f'\n<b>├ User:</b> ️<code>{download.message.from_user.first_name}</code> | <b>Id:</b> <code>{download.message.from_user.id}</code>'
-                        msg += f"\n<b>╰ Cancel: </b><code>/{BotCommands.CancelMirror} {download.gid()}</code>"
-
             elif download.status() == MirrorStatus.STATUS_SEEDING:
                 if config_dict['EMOJI_THEME']:
                     msg += f"\n<b>├📦 Size: </b>{download.size()}"
@@ -312,13 +313,12 @@ def get_readable_message():
                     msg += f" | <b> Time: </b>{download.seeding_time()}"
                     msg += f"\n<b>├ Elapsed: </b>{get_readable_time(time() - download.message.date.timestamp())}"
                     msg += f"\n<b>╰ </b><code>/{BotCommands.CancelMirror} {download.gid()}</code>"
+            elif config_dict['EMOJI_THEME']:
+                msg += f"\n<b>├⛓️ Engine :</b> {download.eng()}"
+                msg += f"\n<b>╰📐 Size: </b>{download.size()}"
             else:
-                if config_dict['EMOJI_THEME']:
-                    msg += f"\n<b>├⛓️ Engine :</b> {download.eng()}"
-                    msg += f"\n<b>╰📐 Size: </b>{download.size()}"
-                else:
-                    msg += f"\n<b>├ Engine :</b> {download.eng()}"
-                    msg += f"\n<b>╰ Size: </b>{download.size()}"
+                msg += f"\n<b>├ Engine :</b> {download.eng()}"
+                msg += f"\n<b>╰ Size: </b>{download.size()}"
             msg += f"\n<b>_________________________________</b>"
             msg += "\n\n"
             if index == STATUS_LIMIT:
@@ -350,18 +350,16 @@ def get_readable_message():
         if config_dict['EMOJI_THEME']:
             bmsg = f"<b>🖥 CPU:</b> {cpu_percent()}% | <b>💿 FREE:</b> {get_readable_file_size(disk_usage(DOWNLOAD_DIR).free)}"
             bmsg += f"\n<b>🎮 RAM:</b> {virtual_memory().percent}% | <b>🟢 UPTIME:</b> {get_readable_time(time() - botStartTime)}"
-            bmsg += f"\n<b>🔻 DL:</b> {get_readable_file_size(dl_speed)}/s | <b>🔺 UL:</b> {get_readable_file_size(up_speed)}/s"
         else:
             bmsg = f"<b>CPU:</b> {cpu_percent()}% | <b>FREE:</b> {get_readable_file_size(disk_usage(DOWNLOAD_DIR).free)}"
             bmsg += f"\n<b>RAM:</b> {virtual_memory().percent}% | <b>UPTIME:</b> {get_readable_time(time() - botStartTime)}"
-            bmsg += f"\n<b>🔻 DL:</b> {get_readable_file_size(dl_speed)}/s | <b>🔺 UL:</b> {get_readable_file_size(up_speed)}/s"
-        
+        bmsg += f"\n<b>🔻 DL:</b> {get_readable_file_size(dl_speed)}/s | <b>🔺 UL:</b> {get_readable_file_size(up_speed)}/s"
         buttons = ButtonMaker()
         buttons.sbutton("Refresh", "status refresh")
         buttons.sbutton("Statistics", str(THREE))
         buttons.sbutton("Close", "status close")
         sbutton = buttons.build_menu(3)
-        
+
         if STATUS_LIMIT and tasks > STATUS_LIMIT:
             msg += f"<b>Tasks:</b> {tasks}\n"
             buttons = ButtonMaker()
@@ -369,14 +367,12 @@ def get_readable_message():
                 buttons.sbutton("⏪Previous", "status pre")
                 buttons.sbutton(f"{PAGE_NO}/{PAGES}", str(THREE))
                 buttons.sbutton("Next⏩", "status nex")
-                buttons.sbutton("Refresh", "status refresh")
-                buttons.sbutton("Close", "status close")
             else:
                 buttons.sbutton("Previous", "status pre")
                 buttons.sbutton(f"{PAGE_NO}/{PAGES}", str(THREE))
                 buttons.sbutton("Next", "status nex")
-                buttons.sbutton("Refresh", "status refresh")
-                buttons.sbutton("Close", "status close")
+            buttons.sbutton("Refresh", "status refresh")
+            buttons.sbutton("Close", "status close")
             button = buttons.build_menu(3)
             return msg + bmsg, button
         return msg + bmsg, sbutton
@@ -456,9 +452,8 @@ def is_gdtot_link(url: str):
 def is_udrive_link(url: str):
     if 'drivehub.ws' in url:
         return 'drivehub.ws' in url
-    else:
-        url = re_match(r'https?://(hubdrive|katdrive|kolop|drivefire)\.\S+', url)
-        return bool(url)
+    url = re_match(r'https?://(hubdrive|katdrive|kolop|drivefire)\.\S+', url)
+    return bool(url)
     
 def is_sharer_link(url: str):
     url = re_match(r'https?://(sharer)\.pw/\S+', url)
@@ -545,7 +540,7 @@ def change_filename(file_, user_id_, dirpath=None, up_path=None, all_edit=True, 
             elif len(args) == 1:
                 __newFileName = __newFileName.replace(args[0], '')
         file_ = __newFileName + ospath.splitext(file_)[1]
-        LOGGER.info("Remname : "+file_)
+        LOGGER.info(f"Remname : {file_}")
     if PREFIX:
         PREFIX = PREFIX.replace('\s', ' ')
         if not file_.startswith(PREFIX):
@@ -558,10 +553,7 @@ def change_filename(file_, user_id_, dirpath=None, up_path=None, all_edit=True, 
         _extOutName = '.'.join(fileDict[:-1]).replace('.', ' ').replace('-', ' ')
         _newExtFileName = f"{_extOutName}{SUFFIX}.{fileDict[-1]}"
         if len(_extOutName) > (64 - (sufLen + _extIn)):
-            _newExtFileName = (
-                _extOutName[: 64 - (sufLen + _extIn)]
-                + f"{SUFFIX}.{fileDict[-1]}"
-            )
+            _newExtFileName = f"{_extOutName[:64 - (sufLen + _extIn)]}{SUFFIX}.{fileDict[-1]}"
         file_ = _newExtFileName
     elif SUFFIX:
         SUFFIX = SUFFIX.replace('\s', ' ')
@@ -572,8 +564,8 @@ def change_filename(file_, user_id_, dirpath=None, up_path=None, all_edit=True, 
         osrename(up_path, new_path)
         up_path = new_path
 
-    cap_mono = ""
     cfont = config_dict['CAPTION_FONT'] if not FSTYLE else FSTYLE
+    cap_mono = ""
     if CAPTION and all_edit:
         CAPTION = CAPTION.replace('\|', '%%').replace('\s', ' ')
         slit = CAPTION.split("|")
@@ -603,25 +595,20 @@ def update_user_ldata(id_, key, value):
         user_data[id_] = {key: value}
 
 def is_sudo(user_id):
-    if user_id in user_data:
-        return user_data[user_id].get('is_sudo')
-    return False
+    return user_data[user_id].get('is_sudo') if user_id in user_data else False
 
 def getdailytasks(user_id, increase_task=False, upleech=0, upmirror=0, check_mirror=False, check_leech=False):
     task, lsize, msize = 0, 0, 0
     if user_id in user_data and user_data[user_id].get('dly_tasks'):
         userdate = user_data[user_id]['dly_tasks'][0]
-        nowdate = datetime.today()
+        nowdate = datetime.now()
         if userdate.year <= nowdate.year and userdate.month <= nowdate.month and userdate.day < nowdate.day:
             if increase_task: task = 1
             elif upleech != 0: lsize += upleech #bytes
             elif upmirror != 0: msize += upmirror #bytes
-            update_user_ldata(user_id, 'dly_tasks', [datetime.today(), task, lsize, msize])
+            update_user_ldata(user_id, 'dly_tasks', [datetime.now(), task, lsize, msize])
             if DATABASE_URL:
                 DbManger().update_user_data(user_id)
-            if check_leech: return lsize
-            elif check_mirror: return msize
-            return task
         else:
             task = user_data[user_id]['dly_tasks'][1]
             lsize = user_data[user_id]['dly_tasks'][2]
@@ -630,35 +617,32 @@ def getdailytasks(user_id, increase_task=False, upleech=0, upmirror=0, check_mir
             elif upleech != 0: lsize += upleech
             elif upmirror != 0: msize += upmirror
             if increase_task or upleech or upmirror:
-                update_user_ldata(user_id, 'dly_tasks', [datetime.today(), task, lsize, msize])
+                update_user_ldata(user_id, 'dly_tasks', [datetime.now(), task, lsize, msize])
                 if DATABASE_URL:
                     DbManger().update_user_data(user_id)
-            if check_leech: return lsize
-            elif check_mirror: return msize
-            return task
     else:
         if increase_task: task += 1
         elif upleech != 0: lsize += upleech
         elif upmirror != 0: msize += upmirror
-        update_user_ldata(user_id, 'dly_tasks', [datetime.today(), task, lsize, msize])
+        update_user_ldata(user_id, 'dly_tasks', [datetime.now(), task, lsize, msize])
         if DATABASE_URL:
             DbManger().update_user_data(user_id)
-        if check_leech: return lsize
-        elif check_mirror: return msize
-        return task
+
+    if check_leech: return lsize
+    elif check_mirror: return msize
+    return task
 
 def is_paid(user_id):
-    if config_dict['PAID_SERVICE'] is True:
-        if user_id in user_data and user_data[user_id].get('is_paid'):
-            ex_date = user_data[user_id].get('expiry_date')
-            if ex_date:
-                odate = datetime.strptime(ex_date, '%d-%m-%Y')
-                ndate = datetime.today()
-                if odate.year <= ndate.year and odate.month <= ndate.month and odate.day < ndate.day:
-                    return False
-            return True
-        else: return False
-    else: return False
+    if config_dict['PAID_SERVICE'] is not True:
+        return False
+    if user_id not in user_data or not user_data[user_id].get('is_paid'):
+        return False
+    if ex_date := user_data[user_id].get('expiry_date'):
+        odate = datetime.strptime(ex_date, '%d-%m-%Y')
+        ndate = datetime.now()
+        if odate.year <= ndate.year and odate.month <= ndate.month and odate.day < ndate.day:
+            return False
+    return True
 
 ONE, TWO, THREE = range(3)
 def pop_up_stats(update, context):
@@ -705,7 +689,6 @@ SENT: {sent} | RECV: {recv}
 DLs: {num_active} | ULs: {num_upload} | SEEDING: {num_seeding}
 ZIP: {num_zip} | UNZIP: {num_unzip} | SPLIT: {num_split}
 """
-    return stats
 dispatcher.add_handler(
-    CallbackQueryHandler(pop_up_stats, pattern="^" + str(THREE) + "$")
+    CallbackQueryHandler(pop_up_stats, pattern=f"^{str(THREE)}$")
 )
